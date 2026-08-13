@@ -92,18 +92,19 @@ class LogParserService
             'raw_log' => $event['full_log'] ?? null,
         ];
 
-        // Advanced CEF Parsing for full_log
+    
         if (!empty($normalized['raw_log']) && str_contains($normalized['raw_log'], 'CEF:')) {
             $cefFields = $this->parseCef($normalized['raw_log']);
             
-            // Map CEF fields to our normalized structure if available
-            $normalized['account_name'] = $normalized['account_name'] ?? $cefFields['accountName'] ?? null;
-            $normalized['scope_name'] = $cefFields['scopeName'] ?? null;
-            $normalized['event_type'] = $cefFields['categoryName'] ?? null;
-            $normalized['action'] = $cefFields['ruleName'] ?? $cefFields['primaryDescription'] ?? null;
-            $normalized['actor'] = $cefFields['userEmail'] ?? null;
             
-            // Merge remaining CEF fields into an extensions array or just keep them accessible
+            $normalized['account_name'] = $normalized['account_name'] ?? $cefFields['accountName'] ?? null;
+            $normalized['scope_name'] = $cefFields['scopeName'] ?? $cefFields['siteName'] ?? null;
+            $normalized['event_type'] = $cefFields['categoryName'] ?? $cefFields['classification'] ?? null;
+            $normalized['action'] = $cefFields['ruleName'] ?? $cefFields['alertName'] ?? $cefFields['primaryDescription'] ?? $cefFields['description'] ?? null;
+            $normalized['actor'] = $cefFields['userEmail'] ?? $cefFields['assetLastLoggedInUser'] ?? null;
+            $normalized['target'] = $normalized['target'] ?? $cefFields['filePath'] ?? $cefFields['fileProcessName'] ?? null;
+            
+           
             $normalized['cef_extensions'] = $cefFields;
         }
 
@@ -121,9 +122,8 @@ class LogParserService
         if ($cefPos !== false) {
             $cefPayload = substr($fullLog, $cefPos);
             
-            // Pattern to match key=value pairs anywhere in the CEF string
-            // This safely bypasses standard pipe separators which don't contain '='
-            preg_match_all('/([a-zA-Z0-9]+)=([^=]+(?=\s+[a-zA-Z0-9]+=|$))/u', $cefPayload, $matches, PREG_SET_ORDER);
+           
+            preg_match_all('/([a-zA-Z0-9_\.]+)=(.*?)(?=\s+[a-zA-Z0-9_\.]+=|$)/u', $cefPayload, $matches, PREG_SET_ORDER);
             
             foreach ($matches as $match) {
                 $key = trim($match[1]);
